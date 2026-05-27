@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Laptop Tracking System</title>
+  <style>
+    :root {font-family: Arial, sans-serif; color-scheme: light;}
+    body {margin:0;background:#f5f7fb;color:#1f2937;}
+    header {background:#111827;color:white;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;}
+    main {max-width:1100px;margin:24px auto;padding:0 16px;}
+    .card {background:white;border-radius:12px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.08);margin-bottom:16px;}
+    h1,h2,h3 {margin:0 0 12px;}
+    .grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;}
+    label {font-size:13px;font-weight:700;display:block;margin-bottom:4px;}
+    input,select,button {width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;box-sizing:border-box;}
+    button {cursor:pointer;background:#2563eb;color:white;border:none;font-weight:700;}
+    button.secondary {background:#e5e7eb;color:#111827;}
+    .actions {display:flex;gap:8px;align-items:end;}
+    table {width:100%;border-collapse:collapse;font-size:14px;}
+    th,td {padding:10px;border-bottom:1px solid #e5e7eb;text-align:left;}
+    .tag {font-size:12px;padding:3px 8px;border-radius:999px;background:#dbeafe;color:#1d4ed8;display:inline-block;}
+    .hidden {display:none;}
+    .muted {color:#6b7280;font-size:13px;}
+    .toolbar {display:flex;gap:8px;flex-wrap:wrap;}
+    .danger {background:#dc2626;}
+  </style>
+</head>
+<body>
+<header>
+  <strong>Laptop Tracking Dashboard</strong>
+  <div id="userInfo" class="muted">Not logged in</div>
+</header>
+<main>
+  <section id="loginSection" class="card">
+    <h2>Login</h2>
+    <p class="muted">Demo users: <strong>admin/admin123</strong> and <strong>agent/agent123</strong></p>
+    <div class="grid">
+      <div><label>Username</label><input id="username" placeholder="admin" /></div>
+      <div><label>Password</label><input id="password" type="password" placeholder="••••••" /></div>
+      <div class="actions"><button id="loginBtn">Login</button></div>
+    </div>
+  </section>
+
+  <section id="panelSection" class="hidden">
+    <div class="card">
+      <h2>Track Laptop</h2>
+      <div class="grid">
+        <div><label>Inventory Asset ID</label><input id="assetId" placeholder="LT-1001" /></div>
+        <div><label>Employee/User</label><input id="assignedTo" placeholder="Neeraj" /></div>
+        <div><label>Current Location</label><input id="location" placeholder="Delhi Office / GPS / City" /></div>
+        <div><label>Usage Hours (today)</label><input id="usage" type="number" min="0" max="24" placeholder="6" /></div>
+        <div><label>Status</label><select id="status"><option>Active</option><option>Idle</option><option>Repair</option><option>Lost</option></select></div>
+        <div class="actions"><button id="saveBtn">Save Entry</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <button class="secondary" id="exportBtn">Export JSON</button>
+        <button class="secondary hidden" id="adminBtn">Admin Panel</button>
+        <button class="danger" id="logoutBtn">Logout</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>All Tracked Laptops</h3>
+      <table>
+        <thead><tr><th>Asset ID</th><th>User</th><th>Location</th><th>Usage</th><th>Status</th><th>Updated</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <div class="card hidden" id="adminSection">
+      <h3>Admin Panel</h3>
+      <p class="muted">Visible only to admin. You can delete all data.</p>
+      <button class="danger" id="clearBtn">Delete All Tracking Records</button>
+    </div>
+  </section>
+</main>
+<script>
+  const users = [
+    { username: 'admin', password: 'admin123', role: 'admin' },
+    { username: 'agent', password: 'agent123', role: 'agent' }
+  ];
+
+  const state = {
+    user: null,
+    records: JSON.parse(localStorage.getItem('laptop_records') || '[]')
+  };
+
+  const el = (id) => document.getElementById(id);
+  const render = () => {
+    const loggedIn = !!state.user;
+    el('loginSection').classList.toggle('hidden', loggedIn);
+    el('panelSection').classList.toggle('hidden', !loggedIn);
+    el('userInfo').textContent = loggedIn
+      ? `Logged in as ${state.user.username} (${state.user.role})`
+      : 'Not logged in';
+
+    const admin = state.user?.role === 'admin';
+    el('adminBtn').classList.toggle('hidden', !admin);
+
+    const rows = el('rows');
+    rows.innerHTML = state.records.map(r => `
+      <tr>
+        <td>${r.assetId}</td>
+        <td>${r.assignedTo}</td>
+        <td>${r.location}</td>
+        <td>${r.usage} hrs</td>
+        <td><span class="tag">${r.status}</span></td>
+        <td>${new Date(r.updatedAt).toLocaleString()}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="6" class="muted">No records yet.</td></tr>';
+  };
+
+  const persist = () => localStorage.setItem('laptop_records', JSON.stringify(state.records));
+
+  el('loginBtn').onclick = () => {
+    const user = users.find(u => u.username === el('username').value.trim() && u.password === el('password').value);
+    if (!user) return alert('Invalid credentials');
+    state.user = user;
+    render();
+  };
+
+  el('logoutBtn').onclick = () => { state.user = null; el('adminSection').classList.add('hidden'); render(); };
+
+  el('saveBtn').onclick = () => {
+    const payload = {
+      assetId: el('assetId').value.trim(),
+      assignedTo: el('assignedTo').value.trim(),
+      location: el('location').value.trim(),
+      usage: Number(el('usage').value || 0),
+      status: el('status').value,
+      updatedAt: Date.now()
+    };
+    if (!payload.assetId || !payload.assignedTo || !payload.location) return alert('Please fill required fields');
+
+    const idx = state.records.findIndex(r => r.assetId === payload.assetId);
+    if (idx >= 0) state.records[idx] = payload;
+    else state.records.push(payload);
+
+    persist();
+    render();
+  };
+
+  el('adminBtn').onclick = () => el('adminSection').classList.toggle('hidden');
+  el('clearBtn').onclick = () => {
+    if (state.user?.role !== 'admin') return alert('Admin only');
+    if (!confirm('Delete all records?')) return;
+    state.records = [];
+    persist();
+    render();
+  };
+
+  el('exportBtn').onclick = () => {
+    const blob = new Blob([JSON.stringify(state.records, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'laptop-tracking-export.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  render();
+</script>
+</body>
+</html>
